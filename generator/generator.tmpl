@@ -1,0 +1,264 @@
+{{define "generate queries" -}}
+{{template "package header" .}}
+{{template "import packages" .Imports -}}
+
+{{range .Queries}}
+// *** {{.Name}} ***
+{{- if gt (len .Params.Fields) 1}}
+{{template "comments" .Params -}}
+type {{name .Name}}Params struct{
+{{- template "struct fields" .Params -}}
+}
+{{- end}}
+{{- if gt (len .Out.Fields) 1}}
+{{template "comments" .Out -}}
+type {{name .Name}}Out struct{
+{{- template "struct fields" .Out -}}
+}
+{{- end}}
+{{template "comments" . -}}
+func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}}) {{template "func return" .}} {
+    {{- template "func query" .}}
+}
+{{end}}
+{{- end}}
+
+{{/********************************************************************/}}
+
+{{define "comments"}}
+{{range .Comment -}}
+// {{.}}
+{{end}}
+{{- end}}
+
+{{define "comments multiline" -}}
+{{if gt (len .Comment) 1 -}}
+    {{range .Comment -}}
+    // {{.}}
+    {{end}}
+{{- end}}
+{{- end}}
+
+{{- define "comments inline" -}}
+{{if eq (len .Comment) 1}} // {{index .Comment 0}}{{end}}
+{{- end}}
+
+{{/********************************************************************/}}
+
+{{define "struct fields" -}}
+{{range .Fields}}
+    {{template "comments multiline" . -}}
+    {{name .Name}} {{.Type}}{{template "comments inline" .}}
+{{- end}}
+{{end}}
+
+{{/********************************************************************/}}
+
+{{- define "func params" -}}
+    {{$name := name .Name}}
+    {{- with .Params.Fields}},
+        {{- if eq (len .) 1}}{{with index . 0}} {{param .Name}} {{.Type}}{{end}}
+        {{- else}} args {{$name}}Params
+        {{- end}}
+    {{- end}}
+    {{- if eq .Type.String "many" -}}
+        {{- with .Out.Fields}}, f func(
+            {{- if eq (len .) 1}}{{with index . 0}}{{param .Name}} {{.Type}}{{end}}
+            {{- else}}out {{$name}}Out
+            {{- end -}}
+        ){{- end}}
+    {{- end -}}
+{{- end -}}
+
+{{- define "func return" -}}
+    {{- if eq .Type.String "one"}}(
+        {{- if eq (len .Out.Fields) 1}}{{with index .Out.Fields 0}}{{.Type}}{{end}}
+        {{- else}}{{name .Name}}Out
+        {{- end -}}
+    , error)
+    {{- else if eq .Type.String "affected"}}(int64, error)
+    {{- else if eq .Type.String "id"}}(int64, error)
+    {{- else}}error
+    {{- end -}}
+{{- end -}}
+
+{{- define "query params" -}}
+    {{- with .Params.Fields}},
+        {{- if eq (len .) 1}}
+            {{- with index . 0}} {{param .Name}}{{end}}
+        {{- else}}
+            {{range .}}args.{{name .Name}},
+            {{end}}
+        {{- end}}
+    {{- end}}
+{{- end -}}
+
+{{- define "out params" -}}
+    {{- if eq (len .Out.Fields) 1}}&out
+    {{- else}}
+        {{range .Out.Fields}}&out.{{name .Name}},
+        {{end}}
+    {{- end}}
+{{- end -}}
+
+
+{{/********************************************************************/}}
+
+{{- define "func query"}}
+{{- if eq .Type.String "many"}}
+	rows, err := q.db.QueryContext(ctx, {{template "sql" .}}{{template "query params" .}})
+    if err != nil {
+        return err
+    }
+    defer rows.Close()
+    
+    var out
+    {{- if eq (len .Out.Fields) 1}}{{with index .Out.Fields 0}} {{.Type}}{{end}}
+    {{- else}} {{name .Name}}Out
+    {{- end}}
+    for rows.Next() {
+		err := rows.Scan({{template "out params" .}})
+        if err != nil {
+			return err
+		}
+
+		f(out)
+	}
+	
+    if err := rows.Close(); err != nil {
+        return err
+    }
+    
+    return rows.Err()
+{{- else if eq .Type.String "one"}}
+	row := q.db.QueryRowContext(ctx, {{template "sql" .}}{{template "query params" .}})
+    
+    var out
+    {{- if eq (len .Out.Fields) 1}}{{with index .Out.Fields 0}} {{.Type}}{{end}}
+    {{- else}} {{name .Name}}Out
+    {{- end}}
+    err := row.Scan({{template "out params" .}})
+	
+    return out, err
+{{- else if eq .Type.String "affected"}}
+    result, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
+    if err != nil {
+        return 0, err
+    }
+    
+    return result.RowsAffected()
+{{- else if eq .Type.String "exist"}}
+    result, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
+    if err != nil {
+        return err
+    }
+    
+    rows, err := result.RowsAffected()
+    if err != nil {
+        return err
+    }
+    
+    if rows == 0 {
+        return ErrNoRows
+    }
+
+    return nil
+{{- else if eq .Type.String "id"}}
+    result, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
+    if err != nil {
+        return 0, err
+    }
+    
+    return result.LastInsertId()
+{{- else}}
+    _, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
+    
+    return err
+{{- end}}
+{{- end}}
+
+{{- define "sql" -}}
+`-- {{.Name}}
+{{.SQL}}`
+{{- end -}}
+
+{{/********************************************************************/}}
+
+{{define "generate db" -}}
+
+{{template "package header" .}}
+
+import (
+    "context"
+    "database/sql"
+    "errors"
+)
+
+type Queries struct {
+    db interface {
+    	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+	    QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+	    QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+    }
+}
+
+func New(db *sql.DB) Queries {
+    return Queries{db: db}
+}
+
+var (
+    ErrTxNotSupported = errors.New("sql: transaction not supported")
+    ErrNoRows = sql.ErrNoRows
+)
+
+func (q Queries) WithTx(ctx context.Context, opt *sql.TxOptions, handler func(q Queries) error) (err error) {
+	db, ok := q.db.(interface{ 
+        BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+    })
+	if !ok {
+		return ErrTxNotSupported
+	}
+
+	tx, err := db.BeginTx(ctx, opt)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		}
+		if err != nil {
+			err = tx.Rollback()
+		}
+	}()
+
+	return handler(Queries{db: tx})
+}
+
+{{- end}}
+
+{{/********************************************************************/}}
+
+{{- define "package header" -}}
+// Code generated by sqlgen. DO NOT EDIT.
+{{- with .Generator}}
+// {{.Name}}{{with .Version}} version: {{.}}{{end}}
+{{- end}}
+{{- with .Source}}
+// source: {{.}}
+{{- end}}
+
+package {{with .Generator.Package}}{{.}}{{else}}database{{end}}
+{{- end}}
+
+{{/********************************************************************/}}
+
+{{define "import packages"}}
+import (
+    "context"
+    {{- range $import, $prefix := .}}
+    {{with $prefix}}{{.}} {{end}}"{{$import}}"
+    {{- end}}
+)
+{{end}}
