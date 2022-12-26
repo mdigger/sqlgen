@@ -57,17 +57,19 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
 {{- define "func params" -}}
     {{$name := name .Name}}
     {{- with .Params.Fields}},
-        {{- if eq (len .) 1}}{{with index . 0}} {{param .Name}} {{.Type}}{{end}}
-        {{- else}} args {{$name}}Params
-        {{- end}}
+    {{- if eq (len .) 1}}
+    {{with index . 0}}{{param .Name}} {{.Type}}{{end}}
+    {{- else}}
+    args {{$name}}Params
+    {{- end}}
     {{- end}}
     {{- if eq .Type.String "many" -}}
         {{- with .Out.Fields}}, 
-        f func(
+    f func(
             {{- if eq (len .) 1}}{{with index . 0}}{{param .Name}} {{.Type}}{{end}}
             {{- else}}out {{$name}}Out
             {{- end -}}
-        ) error{{- end}}
+    ) error{{- end}}
     {{- end -}}
 {{- end -}}
 
@@ -84,12 +86,12 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
 
 {{- define "query params" -}}
     {{- with .Params.Fields}},
-        {{- if eq (len .) 1}}
-            {{- with index . 0}} {{param .Name}}{{end}}
-        {{- else}}
-            {{range .}}args.{{name .Name}},
-            {{end}}
-        {{- end}}
+    {{- if eq (len .) 1}}
+        {{- with index . 0}} {{param .Name}}{{end}}
+    {{- else}}
+        {{range .}}args.{{name .Name}},
+        {{end}}
+    {{- end}}
     {{- end}}
 {{- end -}}
 
