@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 
-// funcMap регистрирует функции для использования в шаблонах
+// funcMap регистрирует функции для использования в шаблонах.
 var funcMap = template.FuncMap{
 	"name":  publicName, // конвертирует строку в название экспортируемого типа
 	"param": param,      // проверяет название параметра
@@ -15,10 +15,17 @@ var funcMap = template.FuncMap{
 
 // name конвертирует название запроса в название функции golang.
 func publicName(s string) string {
-	return name(s, true)
+	s = name(s, true)
+
+	// подменяем некоторые используемые нами названия параметров
+	if s == "Queries" {
+		return s + "_"
+	}
+
+	return s
 }
 
-// param возвращает название параметра
+// param возвращает название параметра.
 func param(s string) string {
 	// подменяем некоторые используемые нами названия параметров
 	switch s {

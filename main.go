@@ -13,21 +13,14 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func init() {
-	log.SetFlags(0) // убираем все флаги вывода в лог
-}
-
-var (
-	module  = "github.com/mdigger/sqlgen"
-	version = "v0.1.0"
-)
-
 func main() {
+	log.SetFlags(0) // убираем все флаги вывода в лог
+
 	// конфигурация приложения, поддерживаемых команд и флагов
 	app := &cli.App{
 		Name:           "sqlgen",
 		Usage:          "Golang SQL queries library generator.",
-		Version:        version,
+		Version:        generator.Version,
 		Description:    helpString(appDescription),
 		DefaultCommand: "generate",
 		Commands: []*cli.Command{{
@@ -133,10 +126,8 @@ func generateCmd(c *cli.Context) error {
 
 		// получаем сгенерированный код с описанием запросов
 		data, err := generator.Query(file, qs.Queries)
-		log.Println("generating code:", len(data), "bytes")
 		if err != nil {
-			os.Stderr.Write(data)
-			return fmt.Errorf("generator %q: %w", file, err)
+			log.Println("generating code error:\n", err)
 		}
 
 		// формируем новое имя файла и записываем в него получившийся код
@@ -144,7 +135,7 @@ func generateCmd(c *cli.Context) error {
 		destination = destination[:len(destination)-len(filepath.Ext(destination))]
 		destination += ".sql.go"
 		log.Println("saving file:", destination)
-		if err = os.WriteFile(destination, data, 0o666); err != nil {
+		if err = os.WriteFile(destination, data, 0o600); err != nil {
 			return fmt.Errorf("save file %q: %w", destination, err)
 		}
 	}
@@ -159,17 +150,19 @@ func generateCmd(c *cli.Context) error {
 	// записываем код библиотеки в файл
 	destination := filepath.Join(outFolder, "db.go")
 	log.Println("saving package code:", destination)
-	if err = os.WriteFile(destination, data, 0o666); err != nil {
+	if err = os.WriteFile(destination, data, 0o600); err != nil {
 		return fmt.Errorf("save main %q: %w", destination, err)
 	}
 
 	log.Println("generation completed!")
+
 	return nil
 }
 
 // helpString возвращает текст с переносом по строкам.
 func helpString(s string) string {
-	return wordwrap.String(s, 72)
+	const maxWidth = 72
+	return wordwrap.String(s, maxWidth)
 }
 
 const (

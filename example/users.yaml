@@ -1,0 +1,40 @@
+select user:
+  type: one
+  sql: |-
+    select *
+    from users
+    where id = ?
+  in:
+    id: string
+  out: &user
+    id: string
+    name: string
+    age: uint
+    comment: sql.NullString
+
+select all users:
+  type: many
+  sql: |-
+    select *
+    from users
+  out: *user
+
+add new user:
+  type: exec
+  sql: |-
+    insert into users
+      (id, name, age, comment)
+    values (?, ?, ?, ?)
+  in: *user
+
+update user:
+  type: exist
+  sql: |-
+    update users
+      set name = ?, age = ?, comment =?
+    where id = ?
+  in:
+    name: string
+    age: uint
+    comment: sql.NullString
+    id: string

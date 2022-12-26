@@ -1,29 +1,129 @@
 {{define "generate queries" -}}
-{{template "package header" .}}
-{{template "import packages" .Imports -}}
+{{template "package header"}}
 
-{{range .Queries}}
+import (
+    "context"
+{{- range $import, $prefix := .Imports}}
+    {{with $prefix}}{{.}} {{end}}"{{$import}}"
+{{- end}}
+)
+
+{{range .Queries -}}
 // *** {{.Name}} ***
-{{- if gt (len .Params.Fields) 1}}
-{{template "comments" .Params -}}
-type {{name .Name}}Params struct{
-{{- template "struct fields" .Params -}}
-}
-{{- end}}
-{{- if gt (len .Out.Fields) 1}}
-{{template "comments" .Out -}}
-type {{name .Name}}Out struct{
-{{- template "struct fields" .Out -}}
-}
-{{- end}}
+
+{{template "struct in" .}}
+
+{{template "struct out" .}}
+
 {{template "comments" . -}}
-func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}}) {{template "func return" .}} {
-    {{- template "func query" .}}
+func (q Queries) {{name .Name}}(ctx context.Context
+    {{- if .In.Fields}},
+    {{- template "params in var" .}} {{template "params in type" .}}{{end -}}
+    {{- if eq .Type.String "many" -}}, f func({{template "params out var" .}} {{template "params out type" .}}) error{{end -}}
+    ) {{template "func return" .}} {
+{{template "func body" . -}}
 }
+
 {{end}}
-{{- end}}
+
+{{end}}
 
 {{/********************************************************************/}}
+
+{{define "params in type"}}
+{{- if eq (len .In.Fields) 0 -}}
+{{- else if eq (len .In.Fields) 1 -}}
+    {{with index .In.Fields 0}}{{.Type}}{{end}}
+{{- else if .In.Anchor -}}
+    {{name .In.Anchor}}
+{{- else if .In.Alias -}}
+    {{name .In.Alias}}
+{{- else -}}
+    {{name .Name}}Params
+{{- end -}}
+{{end}}
+
+{{define "params out type"}}
+{{- if eq (len .Out.Fields) 0 -}}
+{{- else if eq (len .Out.Fields) 1 -}}
+    {{with index .Out.Fields 0}}{{.Type}}{{end}}
+{{- else if .Out.Anchor -}}
+    {{name .Out.Anchor}}
+{{- else if .Out.Alias -}}
+    {{name .Out.Alias}}
+{{- else -}}
+    {{name .Name}}Out
+{{- end -}}
+{{end}}
+
+{{define "params in var"}}
+{{- if eq (len .In.Fields) 0 -}}
+{{- else if eq (len .In.Fields) 1 -}}
+    {{with index .In.Fields 0}}{{param .Name}}{{end}}
+{{- else -}}
+    args
+{{- end -}}
+{{end}}
+
+{{define "params out var"}}
+{{- if eq (len .Out.Fields) 0 -}}
+{{- else if eq (len .Out.Fields) 1 -}}
+    {{with index .Out.Fields 0}}{{param .Name}}{{end}}
+{{- else -}}
+    out
+{{- end -}}
+{{end}}
+
+{{define "params in list"}}
+{{- if eq (len .In.Fields) 0 -}}
+{{- else if eq (len .In.Fields) 1 -}}
+    {{with index .In.Fields 0}}{{param .Name}}{{end}}
+{{- else -}}
+    {{range .In.Fields}}
+    args.{{name .Name}},
+    {{- end}}
+{{- end -}}
+{{end}}
+
+{{define "params out list"}}
+{{- if eq (len .Out.Fields) 0 -}}
+{{- else if eq (len .Out.Fields) 1 -}}
+    {{with index .Out.Fields 0}}&out{{end -}}
+{{- else -}}
+    {{range .Out.Fields}}
+    &out.{{name .Name}},
+    {{- end}}
+{{end -}}
+{{end}}
+
+{{/********************************************************************/}}
+
+{{define "struct in"}}
+{{if and (not .In.Alias) (gt (len .In.Fields) 1)}}
+{{template "comments" .In -}}
+type {{template "params in type" .}} struct {
+    {{- template "struct fields" .In.Fields}}
+}
+{{end}}
+{{end}}
+
+{{define "struct out"}}
+{{if and (not .Out.Alias) (gt (len .Out.Fields) 1)}}
+{{template "comments" .Out -}}
+type {{template "params out type" .}} struct {
+    {{- template "struct fields" .Out.Fields}}
+}
+{{end}}
+{{end}}
+
+{{define "struct fields"}}
+{{- range .}}
+    {{if gt (len .Comment) 1 -}}
+    {{range .Comment}}// {{.}}
+    {{end}}{{end -}}
+    {{name .Name}} {{.Type}}{{if eq (len .Comment) 1}} // {{index .Comment 0}}{{end}}
+{{- end}}
+{{- end}}
 
 {{define "comments"}}
 {{range .Comment -}}
@@ -31,95 +131,29 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
 {{end}}
 {{- end}}
 
-{{define "comments multiline" -}}
-{{if gt (len .Comment) 1 -}}
-    {{range .Comment -}}
-    // {{.}}
-    {{end}}
-{{- end}}
-{{- end}}
+{{/********************************************************************/}}
 
-{{- define "comments inline" -}}
-{{if eq (len .Comment) 1}} // {{index .Comment 0}}{{end}}
+{{define "func return"}}
+{{- if eq .Type.String "affected" "id"}}(int64, error)
+{{- else if eq .Type.String "one"}}({{template "params out type" .}}, error)
+{{- else}}error
+{{- end}}
 {{- end}}
 
 {{/********************************************************************/}}
 
-{{define "struct fields" -}}
-{{range .Fields}}
-    {{template "comments multiline" . -}}
-    {{name .Name}} {{.Type}}{{template "comments inline" .}}
-{{- end}}
-{{end}}
-
-{{/********************************************************************/}}
-
-{{- define "func params" -}}
-    {{$name := name .Name}}
-    {{- with .Params.Fields}},
-    {{- if eq (len .) 1}}
-    {{with index . 0}}{{param .Name}} {{.Type}}{{end}}
-    {{- else}}
-    args {{$name}}Params
-    {{- end}}
-    {{- end}}
-    {{- if eq .Type.String "many" -}}
-        {{- with .Out.Fields}}, 
-    f func(
-            {{- if eq (len .) 1}}{{with index . 0}}{{param .Name}} {{.Type}}{{end}}
-            {{- else}}out {{$name}}Out
-            {{- end -}}
-    ) error{{- end}}
-    {{- end -}}
-{{- end -}}
-
-{{- define "func return" -}}
-    {{- if eq .Type.String "one"}}(
-        {{- if eq (len .Out.Fields) 1}}{{with index .Out.Fields 0}}{{.Type}}{{end}}
-        {{- else}}{{name .Name}}Out
-        {{- end -}}
-    , error)
-    {{- else if eq .Type.String "affected" "id"}}(int64, error)
-    {{- else}}error
-    {{- end -}}
-{{- end -}}
-
-{{- define "query params" -}}
-    {{- with .Params.Fields}},
-    {{- if eq (len .) 1}}
-        {{- with index . 0}} {{param .Name}}{{end}}
-    {{- else}}
-        {{range .}}args.{{name .Name}},
-        {{end}}
-    {{- end}}
-    {{- end}}
-{{- end -}}
-
-{{- define "out params" -}}
-    {{- if eq (len .Out.Fields) 1}}&out
-    {{- else}}
-        {{range .Out.Fields}}&out.{{name .Name}},
-        {{end}}
-    {{- end}}
-{{- end -}}
-
-
-{{/********************************************************************/}}
-
-{{- define "func query"}}
-{{- if eq .Type.String "many"}}
-	rows, err := q.db.QueryContext(ctx, {{template "sql" .}}{{template "query params" .}})
+{{define "func body"}}
+{{- if eq .Type.String "many" -}}
+	rows, err := q.db.QueryContext(ctx, {{template "sql" .}}
+        {{- if .In.Fields}}, {{template "params in list" .}}{{end}})
     if err != nil {
         return err
     }
     defer rows.Close()
-    
-    var out
-    {{- if eq (len .Out.Fields) 1}}{{with index .Out.Fields 0}} {{.Type}}{{end}}
-    {{- else}} {{name .Name}}Out
-    {{- end}}
+
+    var out {{template "params out type" .}}
     for rows.Next() {
-		if err := rows.Scan({{template "out params" .}}); err != nil {
+		if err := rows.Scan({{template "params out list" .}}); err != nil {
 			return err
 		}
 
@@ -127,58 +161,60 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
             return err
         }
 	}
-	
+
     if err := rows.Close(); err != nil {
         return err
     }
-    
+
     return rows.Err()
-{{- else if eq .Type.String "one"}}
-	row := q.db.QueryRowContext(ctx, {{template "sql" .}}{{template "query params" .}})
-    
-    var out
-    {{- if eq (len .Out.Fields) 1}}{{with index .Out.Fields 0}} {{.Type}}{{end}}
-    {{- else}} {{name .Name}}Out
-    {{- end}}
-    err := row.Scan({{template "out params" .}})
-	
+{{- else if eq .Type.String "one" -}}
+	row := q.db.QueryRowContext(ctx, {{template "sql" .}}
+        {{- if .In.Fields}}, {{template "params in list" .}}{{end}})
+
+    var out {{template "params out type" .}}
+    err := row.Scan({{template "params out list" .}})
+
     return out, err
-{{- else if eq .Type.String "affected"}}
-    result, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
+{{- else if eq .Type.String "affected" -}}
+    result, err := q.db.ExecContext(ctx, {{template "sql" .}}
+        {{- if .In.Fields}}, {{template "params in list" .}}{{end}})
     if err != nil {
         return 0, err
     }
-    
+
     return result.RowsAffected()
-{{- else if eq .Type.String "exist"}}
-    result, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
+{{- else if eq .Type.String "exist" -}}
+    result, err := q.db.ExecContext(ctx, {{template "sql" .}}
+        {{- if .In.Fields}}, {{template "params in list" .}}{{end}})
     if err != nil {
         return err
     }
-    
+
     rows, err := result.RowsAffected()
     if err != nil {
         return err
     }
-    
+
     if rows == 0 {
         return ErrNoRows
     }
 
     return nil
-{{- else if eq .Type.String "id"}}
-    result, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
+{{- else if eq .Type.String "id" -}}
+    result, err := q.db.ExecContext(ctx, {{template "sql" .}}
+        {{- if .In.Fields}}, {{template "params in list" .}}{{end}})
     if err != nil {
         return 0, err
     }
-    
+
     return result.LastInsertId()
-{{- else}}
-    _, err := q.db.ExecContext(ctx, {{template "sql" .}}{{template "query params" .}})
-    
+{{- else -}}
+    _, err := q.db.ExecContext(ctx, {{template "sql" .}}
+        {{- if .In.Fields}}, {{template "params in list" .}}{{end}})
+
     return err
 {{- end}}
-{{- end}}
+{{end}}
 
 {{- define "sql" -}}
 `-- {{.Name}}
@@ -187,9 +223,22 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
 
 {{/********************************************************************/}}
 
-{{define "generate db" -}}
+{{define "package header" -}}
+// Code generated by sqlgen. DO NOT EDIT.
+{{- with .Generator}}
+// {{.Name}}{{with .Version}} version: {{.}}{{end}}
+{{- end}}
+{{- with .Source}}
+// source: {{.}}
+{{- end}}
 
-{{template "package header" .}}
+package {{with .Generator.Package}}{{.}}{{else}}database{{end}}
+{{- end}}
+
+{{/********************************************************************/}}
+
+{{define "generate db"}}
+{{- template "package header"}}
 
 import (
     "context"
@@ -215,7 +264,7 @@ var (
 )
 
 func (q Queries) WithTx(ctx context.Context, opt *sql.TxOptions, f func(q Queries) error) (err error) {
-	db, ok := q.db.(interface{ 
+	db, ok := q.db.(interface{
         BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
     })
 	if !ok {
@@ -238,30 +287,4 @@ func (q Queries) WithTx(ctx context.Context, opt *sql.TxOptions, f func(q Querie
 
 	return f(Queries{db: tx})
 }
-
-{{- end}}
-
-{{/********************************************************************/}}
-
-{{- define "package header" -}}
-// Code generated by sqlgen. DO NOT EDIT.
-{{- with .Generator}}
-// {{.Name}}{{with .Version}} version: {{.}}{{end}}
-{{- end}}
-{{- with .Source}}
-// source: {{.}}
-{{- end}}
-
-package {{with .Generator.Package}}{{.}}{{else}}database{{end}}
-{{- end}}
-
-{{/********************************************************************/}}
-
-{{define "import packages"}}
-import (
-    "context"
-    {{- range $import, $prefix := .}}
-    {{with $prefix}}{{.}} {{end}}"{{$import}}"
-    {{- end}}
-)
-{{end}}
+{{end -}}

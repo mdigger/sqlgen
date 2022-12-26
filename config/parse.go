@@ -11,7 +11,7 @@ import (
 func Parse(filename string) (*Queries, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open %q: %w", filename, err)
 	}
 	defer file.Close()
 
