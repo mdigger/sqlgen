@@ -14,7 +14,7 @@ func (s position) Source() string {
 	return fmt.Sprintf("%d:%d", s[0], s[1])
 }
 
-// parseSource
+// parseSource.
 func parseSource(n *yaml.Node) position {
 	return position{n.Line, n.Column}
 }

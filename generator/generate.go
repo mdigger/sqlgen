@@ -2,7 +2,7 @@ package generator
 
 import (
 	"bytes"
-	_ "embed"
+	_ "embed" // use embedded template
 	"fmt"
 	"go/format"
 	"os"
@@ -19,6 +19,11 @@ var (
 	queryTemplates string
 	// tmpl содержит разобранные шаблоны для генерации кода.
 	tmpl = template.Must(template.New("").Funcs(funcMap).Parse(queryTemplates))
+)
+
+const (
+	Module  = "github.com/mdigger/sqlgen"
+	Version = "v0.1.0"
 )
 
 // Generator описывает данные генератора.
@@ -65,8 +70,8 @@ func New(name string, packages ...string) Generator {
 	}
 
 	return Generator{
-		Name:    "github.com/mdigger/sqlgen",
-		Version: "v0.1.0",
+		Name:    Module,
+		Version: Version,
 		Package: name,
 		imports: imports,
 	}
@@ -120,6 +125,8 @@ func generate(name string, data any) ([]byte, error) {
 
 	// форматируем код согласно принятым правилам
 	source := buf.Bytes()
+	// return source, nil
+
 	formatted, err := format.Source(source)
 	if err != nil {
 		return source, fmt.Errorf("format: %w", err)
@@ -156,7 +163,7 @@ func (g Generator) getImports(qs []config.Query) (map[string]string, error) {
 	// проходим по всем параметрам (входящим и исходящим) всех запросов и
 	// выбираем используемые библиотеки
 	for _, q := range qs {
-		for _, t := range q.Params.Fields {
+		for _, t := range q.In.Fields {
 			if err := getImports(t.Type, q.Name); err != nil {
 				return nil, err
 			}

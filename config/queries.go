@@ -11,28 +11,28 @@ type Queries struct {
 }
 
 // Count возвращает количество определенных запросов.
-func (q Queries) Count() int {
-	return len(q.Queries)
+func (qs Queries) Count() int {
+	return len(qs.Queries)
 }
 
 // Names возвращает список имён запросов.
-func (q Queries) Names() []string {
-	if len(q.Queries) == 0 {
+func (qs Queries) Names() []string {
+	if len(qs.Queries) == 0 {
 		return nil
 	}
 
-	list := make([]string, len(q.Queries))
-	for i := range q.Queries {
-		list[i] = q.Queries[i].Name
+	list := make([]string, len(qs.Queries))
+	for i := range qs.Queries {
+		list[i] = qs.Queries[i].Name
 	}
 
 	return list
 }
 
 // Get возвращает ссылку на описание запроса с указанным именем.
-func (q Queries) Get(name string) *Query {
-	if idx, ok := q.index[name]; ok {
-		return &q.Queries[idx]
+func (qs Queries) Get(name string) *Query {
+	if idx, ok := qs.index[name]; ok {
+		return &qs.Queries[idx]
 	}
 
 	return nil

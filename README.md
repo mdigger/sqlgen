@@ -16,7 +16,7 @@ get user:
     select name, age, email
     from users
     where id = ?
-  params:
+  in:
     id: string # user id
   out: # User info.
     name: string # user name
@@ -35,7 +35,7 @@ get user:
   - `affected` -- возвращает количество обработанных запросом записей
   - `exist` -- возвращает ошибку `sql.ErrNoRows`, если ни одна запись не была обработана (`affected == 0`)
 - **`sql`** -- описание запроса в формате SQL
-- **`params`** -- список параметров запроса с их названиями и типами
+- **`in`** -- список параметров запроса с их названиями и типами
   - `name`: `type`
   - ...
 - **`out`** -- так же содержит список параметров, но уже с описанием возвращаемых значений.
@@ -91,12 +91,16 @@ $ sqlgen generate --import uuid:github.com/vgarvardt/pgx-google-uuid/v5
 get user:
   type: one
   sql: |-
-    select name, age, email
+    select id, name, age, email
     from users
     where id = ?
+  in:
+    id: string
   out: &user # <- named param list
+    id: string
     name: string # user name
-    ...
+    age: uint # age
+    email: sql.NullString # email
 ```
 
 В примере выше мы задали имя для списка исходящих параметров (`&user`).
@@ -106,7 +110,7 @@ get user:
 get all users:
   type: many
   sql: |-
-    select name, age, email
+    select id, name, age, email
     from users
   out: *user # <- using named param list
 ```

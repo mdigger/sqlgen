@@ -14,7 +14,7 @@ type Query struct {
 	Comment  Comment    // комментарий
 	Type     Type       // тип запроса
 	SQL      SQL        // текст с SQL запросом
-	Params   Fields     // список входящих параметров запроса
+	In       Fields     // список входящих параметров запроса
 	Out      Fields     // список исходящих параметров ответа
 	position `yaml:"-"` // строка и колонка в исходном файле с SQL запросом
 }
@@ -39,13 +39,13 @@ func (q *Query) UnmarshalYAML(n *yaml.Node) error {
 				return NewError(err, valueNode, "parse sql")
 			}
 
-		case "params":
-			if err := q.Params.UnmarshalYAML(valueNode); err != nil {
-				return NewError(err, valueNode, "parse params")
+		case "in":
+			if err := q.In.UnmarshalYAML(valueNode); err != nil {
+				return NewError(err, valueNode, "parse in params")
 			}
 
 			// добавляем комментарий, который задан на уровне названия
-			q.Params.Comment = parseComments(nameNode)
+			q.In.Comment = parseComments(nameNode)
 
 		case "out":
 			if err := q.Out.UnmarshalYAML(valueNode); err != nil {
@@ -70,8 +70,7 @@ func (q *Query) UnmarshalYAML(n *yaml.Node) error {
 
 		// проверяем, что исходящие параметры не определены как ссылки
 		for _, field := range q.Out.Fields {
-			switch {
-			case field.Type[0] == '*' || field.Type[0] == '&':
+			if field.Type[0] == '*' || field.Type[0] == '&' {
 				return NewError(nil, n, "unsupported field %q type pointer", field.Name)
 			}
 		}
