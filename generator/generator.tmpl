@@ -66,7 +66,7 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
             {{- if eq (len .) 1}}{{with index . 0}}{{param .Name}} {{.Type}}{{end}}
             {{- else}}out {{$name}}Out
             {{- end -}}
-        ){{- end}}
+        ) error{{- end}}
     {{- end -}}
 {{- end -}}
 
@@ -117,12 +117,13 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
     {{- else}} {{name .Name}}Out
     {{- end}}
     for rows.Next() {
-		err := rows.Scan({{template "out params" .}})
-        if err != nil {
+		if err := rows.Scan({{template "out params" .}}); err != nil {
 			return err
 		}
 
-		f(out)
+		if err := f(out); err != nil {
+            return err
+        }
 	}
 	
     if err := rows.Close(); err != nil {
