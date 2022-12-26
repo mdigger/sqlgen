@@ -62,7 +62,8 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
         {{- end}}
     {{- end}}
     {{- if eq .Type.String "many" -}}
-        {{- with .Out.Fields}}, f func(
+        {{- with .Out.Fields}}, 
+        f func(
             {{- if eq (len .) 1}}{{with index . 0}}{{param .Name}} {{.Type}}{{end}}
             {{- else}}out {{$name}}Out
             {{- end -}}
@@ -76,8 +77,7 @@ func (q Queries) {{name .Name}}(ctx context.Context{{template "func params" .}})
         {{- else}}{{name .Name}}Out
         {{- end -}}
     , error)
-    {{- else if eq .Type.String "affected"}}(int64, error)
-    {{- else if eq .Type.String "id"}}(int64, error)
+    {{- else if eq .Type.String "affected" "id"}}(int64, error)
     {{- else}}error
     {{- end -}}
 {{- end -}}
