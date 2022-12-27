@@ -114,42 +114,41 @@ func generateCmd(c *cli.Context) error {
 
 	// инициализируем генератор кода с заданным именем и списком импортируемых библиотек
 	generator := generator.New(name, c.StringSlice("import")...)
+	log.Println("package:  ", generator.Package)
 
 	// обрабатываем все файлы из нашего списка
 	for file := range files {
 		// разбираем описание запроса из файла
 		qs, err := config.Parse(file)
-		log.Println("parsing file:", file)
 		if err != nil {
-			return fmt.Errorf("parse %q: %w", file, err)
+			return fmt.Errorf("parse: %w", err)
 		}
 
 		// получаем сгенерированный код с описанием запросов
 		data, err := generator.Query(file, qs.Queries)
 		if err != nil {
-			log.Println("generating code error:\n", err)
+			log.Println("generating error:\n  ", err)
 		}
 
 		// формируем новое имя файла и записываем в него получившийся код
 		destination := filepath.Join(outFolder, filepath.Base(file))
 		destination = destination[:len(destination)-len(filepath.Ext(destination))]
 		destination += ".sql.go"
-		log.Println("saving file:", destination)
 		if err = os.WriteFile(destination, data, 0o600); err != nil {
 			return fmt.Errorf("save file %q: %w", destination, err)
 		}
+
+		log.Println("generated:", destination)
 	}
 
 	// генерируем код инициализации библиотеки
 	data, err := generator.DB()
-	log.Println("generating package code:", len(data), "bytes")
 	if err != nil {
 		return fmt.Errorf("generate main: %w", err)
 	}
 
 	// записываем код библиотеки в файл
 	destination := filepath.Join(outFolder, "db.go")
-	log.Println("saving package code:", destination)
 	if err = os.WriteFile(destination, data, 0o600); err != nil {
 		return fmt.Errorf("save main %q: %w", destination, err)
 	}
