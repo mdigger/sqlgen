@@ -9,8 +9,9 @@ import (
 
 // funcMap регистрирует функции для использования в шаблонах.
 var funcMap = template.FuncMap{
-	"name":  publicName, // конвертирует строку в название экспортируемого типа
-	"param": param,      // проверяет название параметра
+	"name":   publicName,     // конвертирует строку в название экспортируемого типа
+	"param":  param,          // проверяет название параметра
+	"escape": escapeBacktick, // экранирует символ "`"
 }
 
 // name конвертирует название запроса в название функции golang.
@@ -81,4 +82,8 @@ func name(s string, public bool) string {
 	}
 
 	return name
+}
+
+func escapeBacktick(s string) string {
+	return strings.Replace(s, "`", "`+\"`\"+`", -1)
 }

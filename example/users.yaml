@@ -2,7 +2,7 @@ select user:
   type: one
   sql: |-
     select *
-    from users
+    from `users`
     where id = ?
   in:
     id: string
