@@ -281,7 +281,7 @@ func (q Queries) WithTx(ctx context.Context, opt *sql.TxOptions, f func(q Querie
 			err = tx.Commit()
 		}
 		if err != nil {
-			err = tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}()
 
